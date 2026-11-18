@@ -1,0 +1,99 @@
+=== ENVIRONMENT ===
+Python 3.13.9
+=== PYTEST ===
+/Volumes/MAC_SSD/AI_SDLC_Assignment/.venv313/lib/python3.13/site-packages/pytest_asyncio/plugin.py:306: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to "function" scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session". Set it to "fixture-scope" to keep the current behavior.
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform darwin -- Python 3.13.9, pytest-9.2.0, pluggy-1.7.0 -- /Volumes/MAC_SSD/AI_SDLC_Assignment/.venv313/bin/python
+cachedir: .pytest_cache
+rootdir: /Volumes/MAC_SSD/AI_SDLC_Assignment
+configfile: pyproject.toml
+testpaths: tests
+plugins: platformdirs-4.14.7, anyio-4.16.0, asyncio-1.5.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 28 items
+
+tests/contract/test_approval_contract.py::test_approve_expense_contract PASSED [  3%]
+tests/contract/test_approval_contract.py::test_reject_expense_contract PASSED [  7%]
+tests/contract/test_history_contract.py::test_list_expenses_contract PASSED [ 10%]
+tests/contract/test_history_contract.py::test_get_expense_detail_contract PASSED [ 14%]
+tests/contract/test_submit_contract.py::test_submit_expense_contract PASSED [ 17%]
+tests/integration/test_expense_approval.py::test_manager_approve_expense_success PASSED [ 21%]
+tests/integration/test_expense_approval.py::test_manager_reject_expense_success PASSED [ 25%]
+tests/integration/test_expense_approval.py::test_manager_reject_missing_or_short_reason_fails PASSED [ 28%]
+tests/integration/test_expense_approval.py::test_employee_cannot_approve_or_reject PASSED [ 32%]
+tests/integration/test_expense_approval.py::test_manager_self_approval_prohibited PASSED [ 35%]
+tests/integration/test_expense_approval.py::test_terminal_state_locking PASSED [ 39%]
+tests/integration/test_expense_approval.py::test_approve_reject_nonexistent_expense PASSED [ 42%]
+tests/integration/test_expense_history.py::test_employee_sees_only_own_expenses PASSED [ 46%]
+tests/integration/test_expense_history.py::test_manager_sees_all_submitted_expenses PASSED [ 50%]
+tests/integration/test_expense_history.py::test_filter_expenses_by_status PASSED [ 53%]
+tests/integration/test_expense_history.py::test_filter_expenses_by_category_and_date PASSED [ 57%]
+tests/integration/test_expense_history.py::test_employee_cannot_view_other_employee_detail PASSED [ 60%]
+tests/integration/test_expense_history.py::test_get_nonexistent_expense_detail PASSED [ 64%]
+tests/integration/test_expense_submit.py::test_submit_valid_expense_success PASSED [ 67%]
+tests/integration/test_expense_submit.py::test_submit_negative_amount_fails PASSED [ 71%]
+tests/integration/test_expense_submit.py::test_submit_zero_amount_fails PASSED [ 75%]
+tests/integration/test_expense_submit.py::test_submit_more_than_two_decimals_fails PASSED [ 78%]
+tests/integration/test_expense_submit.py::test_submit_future_date_fails PASSED [ 82%]
+tests/integration/test_expense_submit.py::test_submit_invalid_category_fails PASSED [ 85%]
+tests/integration/test_expense_submit.py::test_submit_missing_auth_headers_fails PASSED [ 89%]
+tests/integration/test_quickstart.py::test_quickstart_scenario_a_employee_submit PASSED [ 92%]
+tests/integration/test_quickstart.py::test_quickstart_scenario_b_negative_validation_and_self_approval PASSED [ 96%]
+tests/integration/test_quickstart.py::test_quickstart_scenario_c_rejection_and_immutability PASSED [100%]
+
+=============================== warnings summary ===============================
+.venv313/lib/python3.13/site-packages/fastapi/testclient.py:1
+  /Volumes/MAC_SSD/AI_SDLC_Assignment/.venv313/lib/python3.13/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/integration/test_expense_approval.py::test_manager_reject_missing_or_short_reason_fails
+tests/integration/test_expense_approval.py::test_manager_reject_missing_or_short_reason_fails
+tests/integration/test_expense_submit.py::test_submit_negative_amount_fails
+tests/integration/test_expense_submit.py::test_submit_zero_amount_fails
+tests/integration/test_expense_submit.py::test_submit_more_than_two_decimals_fails
+tests/integration/test_expense_submit.py::test_submit_future_date_fails
+tests/integration/test_expense_submit.py::test_submit_invalid_category_fails
+tests/integration/test_quickstart.py::test_quickstart_scenario_b_negative_validation_and_self_approval
+  /Volumes/MAC_SSD/AI_SDLC_Assignment/.venv313/lib/python3.13/site-packages/starlette/_exception_handler.py:59: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    response = await handler(conn, exc)  # type: ignore[arg-type]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 28 passed, 9 warnings in 0.19s ========================
+=== RUFF LINT ===
+All checks passed!
+=== RUFF FORMAT ===
+47 files already formatted
+=== BANDIT ===
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: B101
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+[main]	INFO	using config: pyproject.toml
+[main]	INFO	running on Python 3.13.9
+Run started:2026-11-18 16:22:44.841265+00:00
+
+Test results:
+	No issues identified.
+
+Code scanned:
+	Total lines of code: 656
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 0
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 0
+Files skipped (0):
+=== PIP AUDIT ===
+No known vulnerabilities found

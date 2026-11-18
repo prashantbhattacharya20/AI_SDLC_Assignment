@@ -1,0 +1,39 @@
+[project]
+name = "expense-management-system"
+version = "0.1.0"
+description = "Deterministic Expense Management System (MVP)"
+requires-python = ">=3.9"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C4",  # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "B008", # do not perform function calls in argument defaults (standard for FastAPI Depends)
+    "UP006", # preserve typing.List for Python 3.9 runtime evaluation
+    "UP035", # preserve typing imports for Python 3.9
+    "UP045", # preserve Optional[T] for SQLAlchemy 2.0 Python 3.9 runtime mapper
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+skips = ["B101"] # skip assert warning in tests/internal checks
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"

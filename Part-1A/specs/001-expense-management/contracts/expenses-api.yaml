@@ -1,0 +1,376 @@
+openapi: 3.1.0
+info:
+  title: Expense Management API
+  version: 1.0.0
+  description: Deterministic REST API for submitting, reviewing, approving, and tracking employee business expenses (MVP).
+
+paths:
+  /api/v1/expenses:
+    post:
+      summary: Submit a new expense
+      description: Submits a new business expense in SUBMITTED status for manager review.
+      operationId: submitExpense
+      parameters:
+        - $ref: '#/components/parameters/X-User-Id'
+        - $ref: '#/components/parameters/X-User-Role'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseCreateRequest'
+      responses:
+        '201':
+          description: Expense submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    get:
+      summary: List expenses
+      description: Returns expenses for the current user, or all submitted expenses if caller has MANAGER role.
+      operationId: listExpenses
+      parameters:
+        - $ref: '#/components/parameters/X-User-Id'
+        - $ref: '#/components/parameters/X-User-Role'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ExpenseStatus'
+          description: Filter by expense status
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/ExpenseCategory'
+          description: Filter by expense category
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter expenses on or after this date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter expenses on or before this date
+      responses:
+        '200':
+          description: List of expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExpenseResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/v1/expenses/{id}:
+    get:
+      summary: Get expense by ID
+      description: Retrieves complete details of an expense including its approval decisions and audit trail.
+      operationId: getExpenseById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/X-User-Id'
+        - $ref: '#/components/parameters/X-User-Role'
+      responses:
+        '200':
+          description: Expense details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/v1/expenses/{id}/approve:
+    post:
+      summary: Approve an expense
+      description: Approves a SUBMITTED expense. Caller must have MANAGER role and not be the submitter.
+      operationId: approveExpense
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/X-User-Id'
+        - $ref: '#/components/parameters/X-User-Role'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequest'
+      responses:
+        '200':
+          description: Expense approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '403':
+          description: Self-approval forbidden or user lacks MANAGER role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Expense not in SUBMITTED state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/expenses/{id}/reject:
+    post:
+      summary: Reject an expense
+      description: Rejects a SUBMITTED expense with a mandatory reason. Caller must have MANAGER role and not be the submitter.
+      operationId: rejectExpense
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/X-User-Id'
+        - $ref: '#/components/parameters/X-User-Role'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectionRequest'
+      responses:
+        '200':
+          description: Expense rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          description: Missing or empty rejection reason
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Self-rejection forbidden or user lacks MANAGER role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Expense not in SUBMITTED state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  parameters:
+    X-User-Id:
+      name: X-User-Id
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: ID of the authenticated user
+    X-User-Role:
+      name: X-User-Role
+      in: header
+      required: true
+      schema:
+        type: string
+        enum: [EMPLOYEE, MANAGER]
+      description: Role of the authenticated user
+
+  schemas:
+    ExpenseStatus:
+      type: string
+      enum: [SUBMITTED, APPROVED, REJECTED]
+
+    ExpenseCategory:
+      type: string
+      enum: [Travel, Meals, Equipment, Software, Utilities, Other]
+
+    ExpenseCreateRequest:
+      type: object
+      required: [amount, category, description, expense_date]
+      properties:
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          maximum: 1000000.00
+          description: Exact decimal currency amount with max 2 decimal places (paise)
+          example: 1250.50
+        currency:
+          type: string
+          default: INR
+          example: INR
+        category:
+          $ref: '#/components/schemas/ExpenseCategory'
+        description:
+          type: string
+          minLength: 3
+          maxLength: 500
+          example: Client dinner at annual tech conference
+        expense_date:
+          type: string
+          format: date
+          example: "2026-11-15"
+
+    ApprovalRequest:
+      type: object
+      properties:
+        comments:
+          type: string
+          maxLength: 1000
+          example: Approved per quarterly travel budget.
+
+    RejectionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 1000
+          example: Missing itemized receipt and exceeds client dinner per-diem limit.
+
+    ExpenseResponse:
+      type: object
+      required: [id, employee_id, amount, currency, category, description, expense_date, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+          example: 1250.50
+        currency:
+          type: string
+          example: INR
+        category:
+          $ref: '#/components/schemas/ExpenseCategory'
+        description:
+          type: string
+          example: Client dinner
+        expense_date:
+          type: string
+          format: date
+          example: "2026-11-15"
+        status:
+          $ref: '#/components/schemas/ExpenseStatus'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ExpenseDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/ExpenseResponse'
+        - type: object
+          properties:
+            approval_actions:
+              type: array
+              items:
+                $ref: '#/components/schemas/ApprovalActionResponse'
+            audit_trail:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditLogResponse'
+
+    ApprovalActionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        approver_id:
+          type: string
+          format: uuid
+        decision:
+          type: string
+          enum: [APPROVE, REJECT]
+        comments:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AuditLogResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_id:
+          type: string
+          format: uuid
+        action_type:
+          type: string
+        previous_state:
+          type: string
+        resulting_state:
+          type: string
+        notes:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+          example: State transition error description.
+
+  responses:
+    ValidationError:
+      description: Invalid request parameters or body validation failure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnauthorizedError:
+      description: Authentication header missing or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

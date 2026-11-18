@@ -1,0 +1,51 @@
+name: CI Validation Harness
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate-part-1a:
+    name: "Part 1A: Expense Management Harness"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+
+    defaults:
+      run:
+        working-directory: Part-1A
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: Part-1A/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ruff Linter & Formatter Check
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Bandit SAST Scan
+        run: |
+          bandit -c pyproject.toml -r src/
+
+      - name: Dependency Vulnerability Audit
+        run: |
+          pip-audit -r requirements.txt
+
+      - name: Pytest Suite (Unit, Integration, Contract)
+        run: |
+          pytest -v

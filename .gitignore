@@ -1,0 +1,51 @@
+.agents/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Testing & Coverage
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# SQLite & Local DB
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment & IDE
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+.vscode/
+.venv313/
