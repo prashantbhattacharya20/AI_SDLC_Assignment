@@ -13,8 +13,8 @@ This directory stores the raw evaluation output and execution logs from the fina
      - Recall: 100.0% (Threshold: $\ge 80\%$)
      - F1 score: 100.0% (Threshold: $\ge 80\%$)
      - False-positive rate: 0.0% (Threshold: $\le 15\%$)
-     - p95 Latency: 8,589.25 ms (Threshold: $\le 15,000$ ms)
-     - Average Latency: 2,780.0 ms
+     - p95 Latency: 8,852.05 ms (Threshold: $\le 15,000$ ms)
+     - Average Latency: 2,677.56 ms
      - Provider Errors: 0
    - Model ID: `openai/gpt-oss-120b` (Groq provider).
 

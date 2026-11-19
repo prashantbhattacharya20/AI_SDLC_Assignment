@@ -5,6 +5,7 @@ Cites: Part-1B/specs/001-code-review-assistant/plan.md (Evaluation Strategy)
 
 import json
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,8 @@ from evals.metrics import (
     compute_percentile,
     compute_schema_adherence,
     compute_semantic_metrics,
+    validate_invariants,
+    validate_schema,
 )
 from src.schemas.errors import CodeReviewException
 from src.schemas.request import CodeReviewRequest
@@ -68,11 +71,13 @@ class EvaluationRunner:
 
             start_t = time.perf_counter()
             is_schema_valid = False
+            schema_errors: list[str] = []
             is_invariant_compliant = False
+            invariant_errors: list[str] = []
             defect_predicted = None
             is_unevaluable = False
             is_provider_error = False
-            response_payload = {}
+            response_payload: dict[str, Any] = {}
             error_code = None
 
             try:
@@ -81,19 +86,19 @@ class EvaluationRunner:
                 latencies.append(elapsed_ms)
                 total_latency_ms += elapsed_ms
 
-                is_schema_valid = True
+                # Independent schema validation
+                is_schema_valid, schema_errors = validate_schema(res, expected_http_status=expected_http)
+
+                # Independent invariant validation
+                is_invariant_compliant, invariant_errors = validate_invariants(
+                    res, code=code, expected_http_status=expected_http
+                )
+
                 response_payload = res
 
                 findings = res.get("findings", [])
                 summary = res.get("summary", {})
                 status = summary.get("status", "PASS")
-
-                # Deterministic Invariant Check
-                lines_in_code = len(code.splitlines()) or 1
-                all_bounds_valid = all(
-                    1 <= f.get("start_line", 1) <= f.get("end_line", 1) <= lines_in_code for f in findings
-                )
-                is_invariant_compliant = all_bounds_valid
 
                 # Prediction is True if defect detected (findings > 0 or status == FAIL)
                 defect_predicted = (len(findings) > 0) or (status == "FAIL")
@@ -106,15 +111,29 @@ class EvaluationRunner:
                 total_latency_ms += elapsed_ms
                 error_code = exc.error_code
 
+                err_payload = {
+                    "error_code": exc.error_code,
+                    "message": exc.message,
+                    "status_code": exc.status_code,
+                    "details": exc.details,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                }
+
                 if exc.status_code == expected_http:
                     # Expected deterministic validation outcome (e.g. TC-ADV-02 secret screening)
-                    is_schema_valid = True
-                    is_invariant_compliant = True
+                    is_schema_valid, schema_errors = validate_schema(err_payload, expected_http_status=expected_http)
+                    is_invariant_compliant, invariant_errors = validate_invariants(
+                        err_payload, code=code, expected_http_status=expected_http
+                    )
                     defect_predicted = True if not is_clean else False
                     predictions.append(defect_predicted)
                     ground_truth.append(not is_clean)
                 else:
                     # Unexpected provider or network failure (e.g. HTTP 502, 404, rate limits)
+                    is_schema_valid = False
+                    schema_errors = [f"Unexpected error status {exc.status_code}: {exc.message}"]
+                    is_invariant_compliant = False
+                    invariant_errors = ["Provider error encountered"]
                     is_provider_error = True
                     is_unevaluable = True
                     provider_errors.append(
@@ -126,7 +145,28 @@ class EvaluationRunner:
                         }
                     )
 
-                response_payload = {"error": exc.message, "error_code": exc.error_code}
+                response_payload = err_payload
+
+            except Exception as exc:
+                elapsed_ms = int((time.perf_counter() - start_t) * 1000)
+                latencies.append(elapsed_ms)
+                total_latency_ms += elapsed_ms
+                error_code = "UNHANDLED_EXCEPTION"
+                is_schema_valid = False
+                schema_errors = [f"Unhandled exception: {exc}"]
+                is_invariant_compliant = False
+                invariant_errors = [f"Unhandled exception: {exc}"]
+                is_provider_error = True
+                is_unevaluable = True
+                provider_errors.append(
+                    {
+                        "case_id": case_id,
+                        "status_code": 500,
+                        "error_code": "UNHANDLED_EXCEPTION",
+                        "message": str(exc),
+                    }
+                )
+                response_payload = {"error": str(exc), "error_code": "UNHANDLED_EXCEPTION"}
 
             case_results.append(
                 {
@@ -135,7 +175,9 @@ class EvaluationRunner:
                     "scenario": case.get("scenario"),
                     "is_clean": is_clean,
                     "is_schema_valid": is_schema_valid,
+                    "schema_errors": schema_errors,
                     "is_invariant_compliant": is_invariant_compliant,
+                    "invariant_errors": invariant_errors,
                     "defect_predicted": defect_predicted,
                     "is_unevaluable": is_unevaluable,
                     "is_provider_error": is_provider_error,
@@ -268,7 +310,11 @@ class EvaluationRunner:
                 icon = "✗"
             else:
                 pred_str = "Defect" if c.get("defect_predicted") else "Clean"
-                passed = c.get("defect_predicted") == (not c.get("is_clean"))
+                passed = (
+                    c.get("defect_predicted") == (not c.get("is_clean"))
+                    and c.get("is_schema_valid", False)
+                    and c.get("is_invariant_compliant", False)
+                )
                 icon = "✓" if passed else "✗"
             clean_str = "Clean" if c.get("is_clean") else "Defect"
             lines.append(
@@ -276,13 +322,17 @@ class EvaluationRunner:
             )
 
         if m.get("provider_errors"):
-            lines.extend([
-                "\n## Provider Errors Detail",
-                "\n| Case ID | Status Code | Error Code | Error Message |",
-                "| :--- | :---: | :--- | :--- |",
-            ])
+            lines.extend(
+                [
+                    "\n## Provider Errors Detail",
+                    "\n| Case ID | Status Code | Error Code | Error Message |",
+                    "| :--- | :---: | :--- | :--- |",
+                ]
+            )
             for pe in m.get("provider_errors", []):
-                lines.append(f"| `{pe.get('case_id')}` | {pe.get('status_code')} | `{pe.get('error_code')}` | {pe.get('message')} |")
+                lines.append(
+                    f"| `{pe.get('case_id')}` | {pe.get('status_code')} | `{pe.get('error_code')}` | {pe.get('message')} |"
+                )
 
         output_path.write_text("\n".join(lines), encoding="utf-8")
 
