@@ -1,0 +1,18 @@
+{
+  "benchmark_version": "1.0.0",
+  "model_id": "openai/gpt-oss-120b",
+  "temperature": 0.1,
+  "max_retries": 2,
+  "thresholds": {
+    "schema_adherence_min": 1.0,
+    "invariant_compliance_min": 1.0,
+    "precision_min": 0.80,
+    "recall_min": 0.80,
+    "f1_score_min": 0.80,
+    "false_positive_rate_max": 0.15
+  },
+  "performance_targets": {
+    "latency_p95_under_500_lines_ms": 15000,
+    "latency_p95_under_1000_lines_ms": 30000
+  }
+}

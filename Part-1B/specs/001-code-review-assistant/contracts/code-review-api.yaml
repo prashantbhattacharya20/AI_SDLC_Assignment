@@ -1,0 +1,292 @@
+openapi: 3.1.0
+info:
+  title: AI Code Review Assistant API
+  description: Automated static code analysis API powered by Groq LLM with deterministic pre- and post-validation gates.
+  version: 1.0.0
+paths:
+  /api/v1/health:
+    get:
+      summary: Health check endpoint
+      description: Returns service availability status and active model provider configuration.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/review:
+    post:
+      summary: Submit source code for automated review
+      description: Analyzes submitted Python code snippet or file to identify bugs, security vulnerabilities, performance bottlenecks, and maintainability smells.
+      operationId: submitCodeReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeReviewRequest'
+      responses:
+        '200':
+          description: Analysis successfully completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodeReviewResult'
+        '400':
+          description: Bad request (malformed JSON syntax from client).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Payload too large (exceeds 1,000 lines or 65,536 UTF-8 bytes).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error, unsupported language, or identifiable secret detected in submitted code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Bad Gateway (exhausted Groq provider retries or upstream network failure).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - provider
+        - version
+      properties:
+        status:
+          type: string
+          example: "ok"
+        provider:
+          type: string
+          example: "groq"
+        version:
+          type: string
+          example: "1.0.0"
+
+    CodeReviewRequest:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          maxLength: 65536
+          description: Python source code to analyze. Maximum 1,000 lines and maximum 65,536 UTF-8 bytes.
+          example: "def calculate_total(items):\n    return sum(item.price for item in items)"
+        file_path:
+          type: ["string", "null"]
+          description: Optional file name or path reference.
+          example: "services/billing.py"
+        language:
+          type: string
+          enum:
+            - python
+          default: "python"
+          description: Programming language. Strictly 'python' for MVP.
+          example: "python"
+        include_markdown:
+          type: boolean
+          default: false
+          description: Flag to include rendered markdown report string in response.
+
+    DefectCategory:
+      type: string
+      enum:
+        - BUG
+        - SECURITY
+        - PERFORMANCE
+        - MAINTAINABILITY
+
+    SeverityLevel:
+      type: string
+      enum:
+        - CRITICAL
+        - HIGH
+        - MEDIUM
+        - LOW
+        - INFO
+
+    ReviewStatus:
+      type: string
+      enum:
+        - PASS
+        - FAIL
+
+    ReviewFinding:
+      type: object
+      required:
+        - id
+        - title
+        - category
+        - severity
+        - start_line
+        - end_line
+        - description
+        - recommendation
+        - confidence
+      properties:
+        id:
+          type: string
+          example: "finding-001"
+        title:
+          type: string
+          example: "Potential SQL injection in query string formatting"
+        category:
+          $ref: '#/components/schemas/DefectCategory'
+        severity:
+          $ref: '#/components/schemas/SeverityLevel'
+        start_line:
+          type: integer
+          minimum: 1
+          example: 14
+        end_line:
+          type: integer
+          minimum: 1
+          example: 16
+        description:
+          type: string
+          example: "Direct string interpolation of untrusted parameter into SQL execution allows SQL injection."
+        recommendation:
+          type: string
+          example: "Use parameterized queries or SQLAlchemy bind parameters instead of f-strings."
+        confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Model-reported self-assessed certainty estimate (0.0 to 1.0), not a calibrated statistical probability.
+          example: 0.95
+
+    ReviewSummary:
+      type: object
+      required:
+        - status
+        - total_findings
+        - critical_count
+        - high_count
+        - medium_count
+        - low_count
+        - info_count
+      properties:
+        status:
+          $ref: '#/components/schemas/ReviewStatus'
+        total_findings:
+          type: integer
+          example: 1
+        critical_count:
+          type: integer
+          example: 1
+        high_count:
+          type: integer
+          example: 0
+        medium_count:
+          type: integer
+          example: 0
+        low_count:
+          type: integer
+          example: 0
+        info_count:
+          type: integer
+          example: 0
+
+    ReviewTelemetry:
+      type: object
+      required:
+        - model_id
+        - prompt_version
+        - latency_ms
+        - retry_count
+      properties:
+        model_id:
+          type: string
+          description: Exact configured model ID or 'deterministic-ast' when handled locally.
+          example: "openai/gpt-oss-120b"
+        prompt_version:
+          type: string
+          example: "v1.0.0"
+        latency_ms:
+          type: number
+          format: float
+          example: 1245.5
+        prompt_tokens:
+          type: ["integer", "null"]
+          example: 480
+        completion_tokens:
+          type: ["integer", "null"]
+          example: 210
+        total_tokens:
+          type: ["integer", "null"]
+          example: 690
+        retry_count:
+          type: integer
+          minimum: 0
+          maximum: 2
+          description: Number of retries executed after initial attempt (0 to 2).
+          example: 0
+
+    CodeReviewResult:
+      type: object
+      required:
+        - review_id
+        - timestamp
+        - language
+        - summary
+        - findings
+        - telemetry
+      properties:
+        review_id:
+          type: string
+          format: uuid
+          example: "d3b07384-d113-4a37-b64d-cc836374f6e3"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-11-20T01:45:00Z"
+        file_path:
+          type: ["string", "null"]
+          example: "services/billing.py"
+        language:
+          type: string
+          example: "python"
+        summary:
+          $ref: '#/components/schemas/ReviewSummary'
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewFinding'
+        telemetry:
+          $ref: '#/components/schemas/ReviewTelemetry'
+        markdown_report:
+          type: ["string", "null"]
+          example: "# Code Review Report\n..."
+
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          example: "SECRET_DETECTED"
+        message:
+          type: string
+          example: "Identifiable secret pattern 'groq_api_key' detected. Submission rejected for security."
+        details:
+          type: ["object", "null"]
